@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Trascrivi Audio</title>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600&family=Space+Mono&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0f0f0f;
+      --surface: #1a1a1a;
+      --border: #2a2a2a;
+      --accent: #d4f542;       /* acid lime — the one bold choice */
+      --accent-dark: #a8c22e;
+      --text: #f0f0f0;
+      --muted: #777;
+      --error: #ff5c5c;
+      --radius: 10px;
+    }
+
+    body {
+      font-family: 'Space Grotesk', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 48px 20px 80px;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 48px;
+    }
+
+    .wordmark {
+      font-family: 'Space Mono', monospace;
+      font-size: 13px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 16px;
+    }
+
+    h1 {
+      font-size: clamp(28px, 5vw, 44px);
+      font-weight: 600;
+      line-height: 1.15;
+      color: var(--text);
+    }
+
+    h1 span {
+      color: var(--accent);
+    }
+
+    .subtitle {
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 15px;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      width: 100%;
+      max-width: 680px;
+    }
+
+    /* Drop zone */
+    #drop-zone {
+      padding: 56px 32px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      cursor: pointer;
+      border-radius: var(--radius);
+      transition: background 0.15s, border-color 0.15s;
+      border: 2px dashed var(--border);
+      text-align: center;
+    }
+
+    #drop-zone:hover, #drop-zone.dragover {
+      background: #222;
+      border-color: var(--accent);
+    }
+
+    .drop-icon {
+      width: 52px;
+      height: 52px;
+      border-radius: 50%;
+      background: #222;
+      border: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      margin-bottom: 4px;
+    }
+
+    #drop-zone h2 {
+      font-size: 17px;
+      font-weight: 600;
+    }
+
+    #drop-zone p {
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .formats {
+      font-family: 'Space Mono', monospace;
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 4px;
+      letter-spacing: 0.05em;
+    }
+
+    /* File selected state */
+    #file-info {
+      display: none;
+      padding: 20px 24px;
+      border-bottom: 1px solid var(--border);
+      align-items: center;
+      gap: 14px;
+    }
+
+    .file-icon {
+      font-size: 24px;
+      flex-shrink: 0;
+    }
+
+    .file-details {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .file-name {
+      font-weight: 500;
+      font-size: 14px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .file-size {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    .btn-remove {
+      background: none;
+      border: none;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 18px;
+      padding: 4px;
+      line-height: 1;
+      flex-shrink: 0;
+    }
+
+    .btn-remove:hover { color: var(--error); }
+
+    /* Actions */
+    #actions {
+      display: none;
+      padding: 16px 24px;
+      border-top: 1px solid var(--border);
+    }
+
+    .btn-transcribe {
+      width: 100%;
+      padding: 13px;
+      background: var(--accent);
+      color: #0f0f0f;
+      border: none;
+      border-radius: 8px;
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s, transform 0.1s;
+    }
+
+    .btn-transcribe:hover { background: var(--accent-dark); }
+    .btn-transcribe:active { transform: scale(0.99); }
+    .btn-transcribe:disabled {
+      background: #333;
+      color: var(--muted);
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    /* Progress */
+    #progress {
+      display: none;
+      padding: 24px;
+      text-align: center;
+      gap: 12px;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .spinner {
+      width: 32px;
+      height: 32px;
+      border: 3px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    #progress p {
+      font-size: 14px;
+      color: var(--muted);
+    }
+
+    /* Result */
+    #result {
+      display: none;
+      flex-direction: column;
+    }
+
+    .result-header {
+      padding: 16px 24px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .result-meta {
+      font-size: 12px;
+      color: var(--muted);
+      font-family: 'Space Mono', monospace;
+    }
+
+    .result-actions {
+      display: flex;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .btn-action {
+      padding: 7px 14px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text);
+      border-radius: 6px;
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 13px;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+    }
+
+    .btn-action:hover {
+      border-color: var(--accent);
+      background: #1f1f1f;
+    }
+
+    .btn-action.copied {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    #transcript-text {
+      padding: 28px 24px;
+      font-size: 15px;
+      line-height: 1.75;
+      color: var(--text);
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .btn-new {
+      margin: 0 24px 24px;
+      padding: 10px;
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      border-radius: 8px;
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 13px;
+      cursor: pointer;
+      transition: border-color 0.15s, color 0.15s;
+    }
+
+    .btn-new:hover { border-color: var(--accent); color: var(--text); }
+
+    /* Error */
+    #error-msg {
+      display: none;
+      padding: 16px 24px;
+      color: var(--error);
+      font-size: 14px;
+      border-top: 1px solid var(--border);
+    }
+
+    #file-input { display: none; }
+
+    @media (max-width: 480px) {
+      .result-header { flex-direction: column; align-items: flex-start; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="wordmark">Trascrivi Audio</div>
+  <h1>Da voce a <span>testo</span>,<br>in secondi.</h1>
+  <p class="subtitle">Carica un file audio e ottieni la trascrizione automatica.</p>
+</header>
+
+<div class="card" id="main-card">
+
+  <!-- Drop zone -->
+  <div id="drop-zone" role="button" tabindex="0" aria-label="Carica file audio">
+    <div class="drop-icon">🎙</div>
+    <h2>Trascina il file qui</h2>
+    <p>oppure clicca per sceglierlo</p>
+    <div class="formats">MP3 · WAV · M4A · MP4 · OGG · WEBM · FLAC</div>
+  </div>
+
+  <!-- File info -->
+  <div id="file-info">
+    <div class="file-icon">🎵</div>
+    <div class="file-details">
+      <div class="file-name" id="file-name-label"></div>
+      <div class="file-size" id="file-size-label"></div>
+    </div>
+    <button class="btn-remove" id="btn-remove" title="Rimuovi">✕</button>
+  </div>
+
+  <!-- Error -->
+  <div id="error-msg"></div>
+
+  <!-- Actions -->
+  <div id="actions">
+    <button class="btn-transcribe" id="btn-transcribe">Trascrivi</button>
+  </div>
+
+  <!-- Progress -->
+  <div id="progress">
+    <div class="spinner"></div>
+    <p>Trascrizione in corso…</p>
+  </div>
+
+  <!-- Result -->
+  <div id="result">
+    <div class="result-header">
+      <div class="result-meta" id="result-meta"></div>
+      <div class="result-actions">
+        <button class="btn-action" id="btn-copy">Copia</button>
+        <button class="btn-action" id="btn-download">Scarica .txt</button>
+      </div>
+    </div>
+    <div id="transcript-text"></div>
+    <button class="btn-new" id="btn-new">+ Nuova trascrizione</button>
+  </div>
+
+</div>
+
+<input type="file" id="file-input" accept="audio/*,video/*" />
+
+<script>
+  const dropZone    = document.getElementById("drop-zone");
+  const fileInput   = document.getElementById("file-input");
+  const fileInfo    = document.getElementById("file-info");
+  const fileNameLbl = document.getElementById("file-name-label");
+  const fileSizeLbl = document.getElementById("file-size-label");
+  const btnRemove   = document.getElementById("btn-remove");
+  const actions     = document.getElementById("actions");
+  const btnTranscribe = document.getElementById("btn-transcribe");
+  const progress    = document.getElementById("progress");
+  const result      = document.getElementById("result");
+  const transcriptText = document.getElementById("transcript-text");
+  const resultMeta  = document.getElementById("result-meta");
+  const btnCopy     = document.getElementById("btn-copy");
+  const btnDownload = document.getElementById("btn-download");
+  const btnNew      = document.getElementById("btn-new");
+  const errorMsg    = document.getElementById("error-msg");
+
+  let currentFile = null;
+  let currentText = "";
+  let currentFilename = "";
+
+  function formatSize(bytes) {
+    return bytes < 1024 * 1024
+      ? (bytes / 1024).toFixed(1) + " KB"
+      : (bytes / (1024 * 1024)).toFixed(2) + " MB";
+  }
+
+  function formatDuration(sec) {
+    if (!sec) return null;
+    const m = Math.floor(sec / 60), s = Math.floor(sec % 60);
+    return `${m}:${s.toString().padStart(2, "0")}`;
+  }
+
+  function showFile(file) {
+    currentFile = file;
+    fileNameLbl.textContent = file.name;
+    fileSizeLbl.textContent = formatSize(file.size);
+    dropZone.style.display = "none";
+    fileInfo.style.display = "flex";
+    actions.style.display = "block";
+    errorMsg.style.display = "none";
+    result.style.display = "none";
+    progress.style.display = "none";
+  }
+
+  function reset() {
+    currentFile = null;
+    currentText = "";
+    fileInput.value = "";
+    dropZone.style.display = "flex";
+    fileInfo.style.display = "none";
+    actions.style.display = "none";
+    progress.style.display = "none";
+    result.style.display = "none";
+    errorMsg.style.display = "none";
+  }
+
+  dropZone.addEventListener("click", () => fileInput.click());
+  dropZone.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") fileInput.click(); });
+  dropZone.addEventListener("dragover", e => { e.preventDefault(); dropZone.classList.add("dragover"); });
+  dropZone.addEventListener("dragleave", () => dropZone.classList.remove("dragover"));
+  dropZone.addEventListener("drop", e => {
+    e.preventDefault();
+    dropZone.classList.remove("dragover");
+    if (e.dataTransfer.files[0]) showFile(e.dataTransfer.files[0]);
+  });
+
+  fileInput.addEventListener("change", () => {
+    if (fileInput.files[0]) showFile(fileInput.files[0]);
+  });
+
+  btnRemove.addEventListener("click", reset);
+  btnNew.addEventListener("click", reset);
+
+  btnTranscribe.addEventListener("click", async () => {
+    if (!currentFile) return;
+    fileInfo.style.display = "none";
+    actions.style.display = "none";
+    errorMsg.style.display = "none";
+    progress.style.display = "flex";
+
+    const formData = new FormData();
+    formData.append("file", currentFile);
+    currentFilename = currentFile.name;
+
+    try {
+      const res = await fetch("/transcribe", { method: "POST", body: formData });
+      const data = await res.json();
+
+      if (!res.ok || data.error) throw new Error(data.error || "Errore sconosciuto");
+
+      currentText = data.text;
+      transcriptText.textContent = data.text;
+
+      let meta = data.filename;
+      if (data.language) meta += ` · ${data.language.toUpperCase()}`;
+      if (data.duration) meta += ` · ${formatDuration(data.duration)}`;
+      resultMeta.textContent = meta;
+
+      progress.style.display = "none";
+      result.style.display = "flex";
+
+    } catch (err) {
+      progress.style.display = "none";
+      fileInfo.style.display = "flex";
+      actions.style.display = "block";
+      errorMsg.textContent = "⚠️ " + err.message;
+      errorMsg.style.display = "block";
+    }
+  });
+
+  btnCopy.addEventListener("click", () => {
+    navigator.clipboard.writeText(currentText).then(() => {
+      btnCopy.textContent = "Copiato ✓";
+      btnCopy.classList.add("copied");
+      setTimeout(() => { btnCopy.textContent = "Copia"; btnCopy.classList.remove("copied"); }, 2000);
+    });
+  });
+
+  btnDownload.addEventListener("click", () => {
+    const blob = new Blob([currentText], { type: "text/plain" });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement("a");
+    a.href = url;
+    a.download = currentFilename.replace(/\.[^.]+$/, "") + "_trascrizione.txt";
+    a.click();
+    URL.revokeObjectURL(url);
+  });
+</script>
+
+</body>
+</html>
